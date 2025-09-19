@@ -21,7 +21,7 @@ Example (packer.nvim):
 
 ```lua
 use {
-  'yourname/jbang-nvim',
+  'fintanmm/jbang-nvim',
   config = function()
     require('jbang').setup({
       cmd = 'jbang',
