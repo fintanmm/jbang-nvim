@@ -64,5 +64,12 @@ require('jbang').setup({
 })
 ```
 
+Testing
+Run the test suite with `busted` from the project root. The test suite uses a small `vim` mock and validates background job behavior:
+
+```sh
+busted
+```
+
 License
 This project is licensed under the MIT License — see `LICENSE`.
