@@ -6,6 +6,10 @@ local default_config = {
   term_height = 12,
   global_flags = {},
   shell = nil, -- defaults to vim.o.shell
+  -- When `terminal = false`, notify with output when command finishes
+  notify_on_background = true,
+  -- Truncate notification body after this many chars
+  notify_max_chars = 4096,
 }
 
 M._config = vim.deepcopy(default_config)
@@ -84,7 +88,51 @@ local function term_send(cmd_args)
     vim.cmd("normal! G")
   else
     -- Direct jobstart without shell for better quoting
-    vim.fn.jobstart(cmd_args, { detach = false })
+    if M._config.notify_on_background == false then
+      vim.fn.jobstart(cmd_args, { detach = false })
+      return
+    end
+
+    local output = {}
+    local err = {}
+    local function on_stdout(job_id, data, event)
+      if data then
+        for _, line in ipairs(data) do
+          if line ~= '' then table.insert(output, line) end
+        end
+      end
+    end
+    local function on_stderr(job_id, data, event)
+      if data then
+        for _, line in ipairs(data) do
+          if line ~= '' then table.insert(err, line) end
+        end
+      end
+    end
+    local function on_exit(job_id, code, event)
+      local body = ''
+      if #output > 0 then
+        body = table.concat(output, '\n')
+      end
+      if #err > 0 then
+        if body ~= '' then body = body .. '\n\n' end
+        body = body .. table.concat(err, '\n')
+      end
+      if body == '' then body = '(no output)' end
+      local max = M._config.notify_max_chars or 4096
+      if #body > max then body = body:sub(1, max) .. '\n\n...output truncated' end
+      local level = (code == 0) and vim.log.levels.INFO or vim.log.levels.WARN
+      vim.schedule(function()
+        vim.notify(body, level, { title = 'jbang', timeout = 10000 })
+      end)
+    end
+
+    vim.fn.jobstart(cmd_args, {
+      on_stdout = on_stdout,
+      on_stderr = on_stderr,
+      on_exit = on_exit,
+      detach = false,
+    })
   end
 end
 

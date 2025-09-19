@@ -57,6 +57,10 @@ require('jbang').setup({
   term_height = 12,        -- terminal split height
   global_flags = { '--quiet' },
   shell = nil,             -- shell to use for the terminal (defaults to vim.o.shell)
+  -- When running without the terminal (terminal=false), notify with output on completion
+  notify_on_background = true,
+  -- Truncate notifications after this many chars
+  notify_max_chars = 4096,
 })
 ```
 
