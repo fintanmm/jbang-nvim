@@ -213,3 +213,47 @@ vim.api.nvim_create_user_command('JBang', function(opts)
   end
   print('Unknown subcommand: ' .. tostring(sub))
 end, { nargs = '*', complete = complete_jbang })
+
+-- Autocommands for JBang integration
+local group = vim.api.nvim_create_augroup('jbang_nvim', { clear = true })
+
+vim.api.nvim_create_autocmd({ 'BufRead', 'BufNewFile' }, {
+  group = group,
+  pattern = { '*.java', '*.jsh' },
+  callback = function(args)
+    vim.schedule(function()
+      if jbang.is_jbang_file(args.buf) then
+        vim.bo[args.buf].commentstring = '//%s'
+      end
+    end)
+  end,
+})
+
+vim.api.nvim_create_autocmd('BufWritePre', {
+  group = group,
+  pattern = { '*.java', '*.jsh' },
+  callback = function(args)
+    if jbang.is_jbang_file(args.buf) then
+      jbang.fix_formatting(args.buf)
+    end
+  end,
+})
+
+-- Command to refresh LSP classpath
+vim.api.nvim_create_user_command('JBangRefreshLSP', function()
+  local bufnr = vim.api.nvim_get_current_buf()
+  if jbang.is_jbang_file(bufnr) then
+    local config = jbang.lsp.get_jdtls_config(vim.api.nvim_buf_get_name(bufnr))
+    if config and config.settings then
+      -- This is a hint for how to apply it, usually requires nvim-jdtls 
+      -- or manual workspace/didChangeConfiguration
+      vim.notify("JBang: Dependencies resolved. If using nvim-jdtls, these have been retrieved.", vim.log.levels.INFO)
+      -- In a real scenario, we might want to try and find the active client and send a notification
+      local clients = vim.lsp.get_active_clients({ bufnr = bufnr, name = "jdtls" })
+      for _, client in ipairs(clients) do
+        client.config.settings = vim.tbl_deep_extend("force", client.config.settings, config.settings)
+        client.notify("workspace/didChangeConfiguration", { settings = client.config.settings })
+      end
+    end
+  end
+end, {})
