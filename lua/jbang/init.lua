@@ -14,6 +14,7 @@ local default_config = {
 
 M._config = vim.deepcopy(default_config)
 M._term = nil
+M.lsp = require('jbang.lsp')
 
 function M.setup(opts)
   M._config = vim.tbl_deep_extend("force", default_config, opts or {})
@@ -144,6 +145,38 @@ local function current_script()
 end
 
 -- Public API
+function M.is_jbang_file(bufnr)
+  bufnr = bufnr or 0
+  local lines = vim.api.nvim_buf_get_lines(bufnr, 0, 10, false)
+  for _, line in ipairs(lines) do
+    if line:match("^#!/usr/bin/env jbang") or line:match("^//DEPS") or line:match("^//SOURCES") or line:match("^//JAVA") then
+      return true
+    end
+  end
+  return false
+end
+
+function M.fix_formatting(bufnr)
+  bufnr = bufnr or 0
+  local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+  local changed = false
+  for i, line in ipairs(lines) do
+    -- Fix "// DEPS" -> "//DEPS", etc.
+    local new_line = line:gsub("^//%s+(DEPS)", "//%1")
+                         :gsub("^//%s+(SOURCES)", "//%1")
+                         :gsub("^//%s+(JAVA)", "//%1")
+                         :gsub("^//%s+(GAV)", "//%1")
+                         :gsub("^//%s+(FILES)", "//%1")
+    if new_line ~= line then
+      lines[i] = new_line
+      changed = true
+    end
+  end
+  if changed then
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
+  end
+end
+
 function M.run(target, args, flags)
   if not ensure_binary() then return end
   local tgt = target
